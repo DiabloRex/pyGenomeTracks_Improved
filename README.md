@@ -5,6 +5,14 @@
 
 pyGenomeTracks
 ==============
+Improvement:
+1. when using bed files as input regions, using 4th col for part of file name, {pre}.{4th}.{ext}. also included in title. but make sure you have at least 4 cols in your bed file.
+2. when using bed files as input regions, you can specify a flanking length to the left and right of your regions in the bed files. default flank size: 0.
+3. when using flank, a chrom_size file is required. a text file including chr names and size. as below:
+    chr1\t218378137
+    chr2\t138728524
+    ...
+
 
 Standalone program and library to plot beautiful genome browser tracks
 ----------------------------------------------------------------------
