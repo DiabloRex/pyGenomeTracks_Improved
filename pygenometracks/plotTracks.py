@@ -239,7 +239,13 @@ def parse_arguments(args=None):
 
     parser.add_argument('--version', action='version',
                         version=f'%(prog)s {__version__}')
-
+    parser.add_argument('--flank',
+                        help="Adding flanking size to BED files, Add by DiabloRex",
+                        default=0,
+                        type=int)
+    parser.add_argument('--chrom',
+                        help="Adding chromosome size file to avoid flank overflow, Add by DiabloRex",
+                        type=argparse.FileType('r'))
     return parser
 
 
@@ -294,12 +300,20 @@ def main(args=None):
 
     args = parse_arguments().parse_args(args)
 
+    # read chromosome size file:
+    if args.chrom:
+        chrom_size = {}
+        for ln in args.chrom.readlines():
+            items = ln.strip().split('\t')
+            chrom_size[items[0]] = int(items[1])
+
     # Identify the regions to plot:
     if args.BED:
         regions = []
+        name_regions = []
         for line in args.BED.readlines():
             try:
-                chrom, start, end = line.strip().split('\t')[0:3]
+                chrom, start, end, name = line.strip().split('\t')[0:4]
             except ValueError:
                 continue
             try:
@@ -307,13 +321,13 @@ def main(args=None):
             except ValueError as detail:
                 warnings.warn(f"Invalid value found at line\t{line}\t. {detail}\n")
                 continue
-            regions.append((chrom, start, end))
+            regions.append((chrom, start - args.flank if start - args.flank > 0 else 0, end + args.flank if end + args.flank < chrom_size[chrom] else chrom_size[chrom]))
+            name_regions.append((chrom, start, end, name))
     else:
         regions = [get_region(args.region)]
 
     if len(regions) == 0:
         raise InputError("There is no valid regions to plot.")
-
     # Create all the tracks
     trp = PlotTracks(args.tracks.name, args.width, fig_height=args.height,
                      fontsize=args.fontSize, dpi=args.dpi,
@@ -325,14 +339,17 @@ def main(args=None):
         name = args.outFileName.split(".")
         file_suffix = name[-1]
         file_prefix = ".".join(name[:-1])
-        for chrom, start, end in regions:
-            file_name = f"{file_prefix}_{chrom}-{start}-{end}.{file_suffix}"
+        for chrom, start, end, gname in name_regions:
+            file_title = f"{args.title}_{gname}_{chrom}-{start}-{end}"
+            file_name = f"{file_prefix}.{gname}.{file_suffix}"
+            start = start - args.flank if start - args.flank > 0 else 0
+            end = end + args.flank if end + args.flank < chrom_size[chrom] else chrom_size[chrom]
             if end - start < 200000:
                 warnings.warn("A region shorter than 200kb has been "
                               "detected! This can be too small to return "
                               "a proper TAD plot!\n")
             sys.stderr.write(f"saving {file_name}\n")
-            trp.plot(file_name, chrom, start, end, title=args.title,
+            trp.plot(file_name, chrom, start, end, title=file_title,
                      h_align_titles=args.trackLabelHAlign,
                      decreasing_x_axis=args.decreasingXAxis)
     else:
